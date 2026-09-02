@@ -89,7 +89,7 @@ def dashboard():
     print(f"  {YELLOW}10.{RESET} Research a company")
     print(f"  {YELLOW}11.{RESET} Check resume against a job (ATS score)")
     print(f"  {YELLOW}12.{RESET} Generate interview prep")
-    print(f"  {YELLOW}13.{RESET} Generate cover letter")
+    print(f"  {YELLOW}13.{RESET} Generate cover letter (v1)")
     print(f"  {YELLOW}14.{RESET} Research salary for a role")
     print(f"  {YELLOW}15.{RESET} Networking pipeline (contacts)")
     print(f"  {YELLOW}16.{RESET} Follow-up scheduler")
@@ -98,14 +98,18 @@ def dashboard():
     print(f"  {YELLOW}19.{RESET} GitHub ops resources & templates")
     print(f"  {YELLOW}20.{RESET} Scan additional job boards (Remotive, etc.)")
     print(f"  {YELLOW}21.{RESET} 🆕 Auto-apply to entry-level jobs (Comet browser)")
-    print(f"  {YELLOW}22.{RESET} 🆕 ATS Resume Optimizer (score all resumes)")
-    print(f"  {YELLOW}23.{RESET} 🆕 Application Tracker (stats & analytics)")
-    print(f"  {YELLOW}24.{RESET} 🆕 LinkedIn Profile Optimizer")
-    print(f"  {YELLOW}25.{RESET} 🆕 Job Alerts (continuous monitoring)")
-    print(f"  {YELLOW}26.{RESET} 🆕 Daily Digest (email summary)")
+    print(f"  {YELLOW}22.{RESET} ATS Resume Optimizer")
+    print(f"  {YELLOW}23.{RESET} Application Tracker")
+    print(f"  {YELLOW}24.{RESET} LinkedIn Profile Optimizer")
+    print(f"  {YELLOW}25.{RESET} Job Alerts (old)")
+    print(f"  {YELLOW}26.{RESET} Daily Digest")
+    print(f"  {YELLOW}27.{RESET} 🆕 Cover Letter Generator v2 (AI-tailored)")
+    print(f"  {YELLOW}28.{RESET} 🆕 Job Alerts v2 (Watch mode)")
+    print(f"  {YELLOW}29.{RESET} 🆕 Analytics Dashboard (Full stats)")
+    print(f"  {YELLOW}30.{RESET} 🆕 Export applications to CSV")
     print(f"  {YELLOW}0.{RESET} Exit")
     
-    return input("\nChoose action (0-20): ")
+    return input("\nChoose action (0-30): ")
 
 def run_linkedin():
     print(f"\n{GREEN}Starting LinkedIn automation...{RESET}")
@@ -501,6 +505,49 @@ def main():
         
         elif action == "26":
             run_daily_digest()
+        
+        elif action == "27":
+            print("\n📝 Cover Letter Generator v2 (AI-Tailored)")
+            print("="*40)
+            title = input("Job Title: ").strip()
+            company = input("Company: ").strip()
+            manager = input("Hiring Manager (optional, Enter to skip): ").strip() or None
+            job_file = input("Job description file (optional, Enter to skip): ").strip() or None
+            tone = input("Tone [professional/enthusiastic/concise] (default: professional): ").strip() or "professional"
+            fmt = input("Format [md/txt/html/pdf] (default: md): ").strip() or "md"
+            cmd = f"python3 cover_letter_v2.py '{title}' '{company}' --tone {tone} --format {fmt}"
+            if manager:
+                cmd += f" --manager '{manager}'"
+            if job_file:
+                cmd += f" --job '{job_file}'"
+            os.system(cmd)
+
+        elif action == "28":
+            print("\n🔔 Job Alerts v2")
+            print("="*40)
+            mode = input("Mode [once/watch/digest/stats] (default: once): ").strip() or "once"
+            if mode == "watch":
+                interval = input("Interval in minutes (default: 15): ").strip() or "15"
+                channels = input("Channels [terminal/email/slack/macos] space-separated (default: terminal): ").strip() or "terminal"
+                cmd = f"python3 job_alerts_v2.py watch --interval {interval} --channels {channels}"
+            elif mode == "digest":
+                cmd = "python3 job_alerts_v2.py digest"
+            elif mode == "stats":
+                cmd = "python3 job_alerts_v2.py stats"
+            else:
+                channels = input("Channels [terminal/email/slack/macos] space-separated (default: terminal): ").strip() or "terminal"
+                cmd = f"python3 job_alerts_v2.py once --channels {channels}"
+            os.system(cmd)
+
+        elif action == "29":
+            print("\n📊 Analytics Dashboard")
+            print("="*40)
+            mode = input("View [dashboard/export/funnel/platforms/categories] (default: dashboard): ").strip() or "dashboard"
+            os.system(f"python3 analytics_dashboard.py {mode}")
+
+        elif action == "30":
+            print("\n📤 Exporting applications to CSV...")
+            os.system("python3 analytics_dashboard.py export")
         
         else:
             print(f"\n{RED}Invalid action. Try again.{RESET}")
