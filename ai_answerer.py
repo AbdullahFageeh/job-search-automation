@@ -50,7 +50,7 @@ ANSWERS_CACHE = BASE_DIR / "answers.json"
 PROFILE_FILE = BASE_DIR / "profile.yaml"
 
 # Lightweight, cheap model for answering questions
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "groq/compound"  # Groq model (matches CLAW_MODEL in env)distill-llama-70b"  # Groq's fast free-tier model
 
 
 class AIAnswerer:
@@ -70,7 +70,10 @@ class AIAnswerer:
         self.answers_cache = self._load_cache()
 
         if provider == "openai":
-            self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+            self.client = OpenAI(
+                api_key=api_key or os.getenv("OPENAI_API_KEY"),
+                base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            )
         elif provider == "anthropic" and HAS_ANTHROPIC:
             self.client = Anthropic(api_key=api_key or os.getenv("ANTHROPIC_API_KEY"))
         else:
@@ -161,31 +164,42 @@ class AIAnswerer:
     # ─── LLM Calls ────────────────────────────────────────────────────────
 
     def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
-        """Call the LLM with given prompts."""
-        try:
-            if self.provider == "openai":
-                resp = self.client.chat.completions.create(
-                    model=DEFAULT_MODEL,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=0.3,
-                    max_tokens=500,
-                )
-                return resp.choices[0].message.content.strip()
-            else:  # Anthropic
-                resp = self.client.messages.create(
-                    model="claude-sonnet-4-20250514",
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": user_prompt}],
-                    temperature=0.3,
-                    max_tokens=500,
-                )
-                return resp.content[0].text.strip()
-        except Exception as e:
-            print(f"  ⚠️  LLM error: {e}")
-            return ""
+        """Call the LLM with given prompts, with retry on rate limit."""
+        import time as _time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if self.provider == "openai":
+                    resp = self.client.chat.completions.create(
+                        model=DEFAULT_MODEL,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        temperature=0.3,
+                        max_tokens=500,
+                    )
+                    return resp.choices[0].message.content.strip()
+                else:  # Anthropic
+                    resp = self.client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": user_prompt}],
+                        temperature=0.3,
+                        max_tokens=500,
+                    )
+                    return resp.content[0].text.strip()
+            except Exception as e:
+                err_msg = str(e)
+                if "429" in err_msg or "rate_limit" in err_msg.lower():
+                    wait = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                    print(f"  ⏳ Rate limited, retrying in {wait}s... (attempt {attempt+1}/{max_retries})")
+                    _time.sleep(wait)
+                else:
+                    print(f"  ⚠️  LLM error: {e}")
+                    return ""
+        print("  ⚠️  LLM rate limit exceeded after retries")
+        return ""
 
     # ─── Core Answering Methods ───────────────────────────────────────────
 
@@ -208,8 +222,8 @@ class AIAnswerer:
             answer = self._answer_cover_letter(question)
         elif "salary" in q_lower or "compensation" in q_lower or "expectation" in q_lower:
             answer = self._answer_salary(question)
-        elif "years" in q_lower or "how long" in q_lower or "experience" in q_lower:
-            answer = self._answer_numeric(question)
+        elif ("how many years" in q_lower or "how long" in q_lower) and ("experience" in q_lower or "work" in q_lower):
+            answer = self.answer_numeric(question)
         else:
             answer = self._answer_general(question)
 
@@ -265,12 +279,19 @@ Answer with only a number:"""
 You MUST return exactly one of the provided options. Do not modify, paraphrase, or create new options.
 Consider the applicant's profile and pick the most accurate, favorable option."""
 
-        profile_summary = json.dumps(self.profile, indent=2)
-        user_prompt = f"""My profile:
+        exp = self.profile.get('experience_details', {})
+        profile_summary = (
+            f"Experience: {exp.get('summary', '')}\n"
+            f"Total years: {exp.get('total_years', '')}\n"
+            f"Leadership: {exp.get('leadership', '')}\n"
+            f"Remote work: {self.profile.get('work_preferences', {}).get('work_style', '')}\n"
+            f"Authorized SA: {self.profile.get('legal_authorization', {}).get('authorized_to_work_saudi_arabia', '')}"
+        )
+        user_prompt = f"""My profile summary:
 {profile_summary}
 
 Job description (if available):
-{self.current_job_description[:1000] if self.current_job_description else "Not provided"}
+{self.current_job_description[:300] if self.current_job_description else "Not provided"}
 
 Question: {question}
 
@@ -370,15 +391,23 @@ Answer the question directly and concisely based on the provided resume and prof
 Keep answers under 140 characters unless the question clearly requires more detail.
 Be honest, confident, and professional. If you don't know, say "I'm willing to learn" rather than lying."""
 
-        profile_summary = json.dumps(self.profile, indent=2)
-        user_prompt = f"""My resume:
-{self.resume_text[:1500]}
+        # Use concise profile summary instead of full YAML
+        exp = self.profile.get('experience_details', {})
+        skills = self.profile.get('skills', {})
+        profile_summary = (
+            f"Name: {self.profile.get('personal_information', {}).get('name', '')}\n"
+            f"Experience: {exp.get('summary', '')}\n"
+            f"Total years: {exp.get('total_years', '')}\n"
+            f"Leadership: {exp.get('leadership', '')}\n"
+            f"Hard skills: {', '.join(skills.get('hard_skills', []))}\n"
+            f"Soft skills: {', '.join(skills.get('soft_skills', []))}"
+        )
 
-My profile data:
+        user_prompt = f"""My profile summary:
 {profile_summary}
 
 Job I'm applying to: {self.current_company or "Unknown company"}
-{f"Job description: {self.current_job_description[:800]}" if self.current_job_description else ""}
+{f"Job description: {self.current_job_description[:500]}" if self.current_job_description else ""}
 
 Question: {question}
 
