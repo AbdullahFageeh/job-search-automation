@@ -197,26 +197,29 @@ def mark_notified(link):
 # JOB SCANNING
 # ============================================================
 
-def scan_for_new_jobs():
+def scan_for_new_jobs(include_linkedin=True):
     """Scan all sources for new jobs, return new ones only."""
     from entry_level_jobs import load_seen, load_jobs, SEARCH_SOURCES, scrape_linkedin
     from other_boards_monitor import scan_all as scan_other_boards
 
     new_jobs = []
 
-    # LinkedIn scan
-    try:
-        seen = load_seen()
-        for source in SEARCH_SOURCES[:3]:  # Top 3 sources only for speed
-            jobs = scrape_linkedin(source)
-            for job in jobs:
-                if job["link"] not in seen:
-                    job["alerted"] = True
-                    new_jobs.append(job)
-    except Exception as e:
-        print(f"  ⚠️  LinkedIn scan error: {e}")
+    # LinkedIn scan (only if running with display)
+    if include_linkedin:
+        try:
+            seen = load_seen()
+            for source in SEARCH_SOURCES[:3]:  # Top 3 sources only for speed
+                jobs = scrape_linkedin(source)
+                for job in jobs:
+                    if job["link"] not in seen:
+                        job["alerted"] = True
+                        new_jobs.append(job)
+        except Exception as e:
+            print(f"  ⚠️  LinkedIn scan skipped (browser not available): {e}")
+    else:
+        print("  ℹ️  LinkedIn scan skipped (background mode)")
 
-    # Other boards scan
+    # Other boards scan (HTTP-based, works in background)
     try:
         other_new = scan_other_boards()
         for job in other_new:
@@ -233,13 +236,16 @@ def scan_for_new_jobs():
 # MAIN
 # ============================================================
 
-def check_new_jobs(channels=None):
+def check_new_jobs(channels=None, skip_linkedin=False):
     """Check for new jobs and send alerts."""
     if channels is None:
         channels = ["terminal"]
 
     print(f"\n🔍 Scanning for new jobs... ({datetime.now().strftime('%H:%M:%S')})")
-    new_jobs = scan_for_new_jobs()
+    if skip_linkedin:
+        print("   ⏭️  Skipping LinkedIn (background mode)")
+
+    new_jobs = scan_for_new_jobs(include_linkedin=not skip_linkedin)
 
     if not new_jobs:
         print("  No new jobs found ✅")
@@ -326,16 +332,18 @@ def main():
         check_new_jobs(args.channels)
 
     elif args.action == "watch":
+        # In watch (background) mode, always skip LinkedIn — browser can't run in background
         print(f"{'='*60}")
-        print(f"🔔 JOB ALERT WATCHER")
+        print(f"🔔 JOB ALERT WATCHER (Background Mode)")
         print(f"   Interval: {args.interval} minutes")
         print(f"   Channels: {', '.join(args.channels)}")
+        print(f"   Sources: 8 job boards (LinkedIn skipped — use dashboard #21 for LinkedIn)")
         print(f"   Press Ctrl+C to stop")
         print(f"{'='*60}")
 
         while True:
             try:
-                check_new_jobs(args.channels)
+                check_new_jobs(args.channels, skip_linkedin=True)
                 print(f"⏳ Next scan in {args.interval} minutes...")
                 time.sleep(args.interval * 60)
             except KeyboardInterrupt:

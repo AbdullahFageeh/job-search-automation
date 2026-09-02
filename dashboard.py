@@ -107,6 +107,8 @@ def dashboard():
     print(f"  {YELLOW}28.{RESET} 🆕 Job Alerts v2 (Watch mode)")
     print(f"  {YELLOW}29.{RESET} 🆕 Analytics Dashboard (Full stats)")
     print(f"  {YELLOW}30.{RESET} 🆕 Export applications to CSV")
+    print(f"  {YELLOW}31.{RESET} 🆕 Clean AI Watermarks from files")
+    print(f"  {YELLOW}32.{RESET} 🆕 Scan all cover letters for AI marks")
     print(f"  {YELLOW}0.{RESET} Exit")
     
     return input("\nChoose action (0-30): ")
