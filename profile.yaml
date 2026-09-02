@@ -1,0 +1,128 @@
+# Personal Profile for AI Application Question Answering
+# This file provides structured data for auto-answering application form questions.
+# The AI uses this data to generate accurate, consistent answers.
+
+personal_information:
+  name: "Abdullah Fageeh"
+  email: "AbdullahFageeh@gmail.com"
+  phone: "+966 595 266 637"
+  city: "Jeddah"
+  country: "Saudi Arabia"
+  linkedin: "https://linkedin.com/in/abdullah-fageeh"
+  date_of_birth: "Not specified"
+
+self_identification:
+  gender: "Male"
+  pronouns: "He/Him"
+  veteran: "No"
+  disability: "No"
+  ethnicity: "Middle Eastern"
+
+legal_authorization:
+  authorized_to_work_saudi_arabia: "Yes"
+  authorized_to_work_us: "No"
+  authorized_to_work_eu: "No"
+  visa_sponsorship_needed: "Yes for US/EU roles"
+  remote_work_preferred: "Yes"
+
+work_preferences:
+  work_style: "Remote preferred, open to hybrid"
+  open_to_relocation: "Open to relocation for the right opportunity"
+  open_to_travel: "Yes, willing to travel as needed"
+  availability: "Available immediately"
+  employment_type: "Full-time"
+  willing_to_complete_assessments: "Yes"
+  willing_to_complete_background_check: "Yes"
+
+education_details:
+  - degree: "Bachelor's Degree"
+    field: "Not specified"
+    university: "Not specified"
+    graduation_year: "Not specified"
+
+certifications:
+  - "PMP (Project Management Professional) - Trained"
+  - "NEBOSH (National Examination Board in Occupational Safety and Health) - Certified"
+
+experience_details:
+  summary: "6+ years in operations, business operations, and event production management"
+  total_years: "6+"
+  industries:
+    - "Events & Entertainment"
+    - "Motorsport (Formula 1)"
+    - "Aviation"
+    - "Live Production"
+  key_roles:
+    - position: "Account Manager, Client Operations"
+      company: "mediaPro International Middle East"
+      period: "Oct 2025 – Apr 2026"
+    - position: "Production Manager"
+      company: "SRMGX (Saudi Motorsport Group)"
+      period: "Oct – Nov 2025"
+    - position: "Production Manager"
+      company: "Threads Culture"
+      period: "Dec 2024 – Jan 2025"
+    - position: "Site Manager"
+      company: "SRMGX · Riyadh Fashion Week"
+      period: "Oct – Nov 2024"
+    - position: "Venue Operations Specialist"
+      company: "Saudi Arabian GP (Formula 1)"
+      period: "Jan – Mar 2024"
+    - position: "Overlay Site Supervisor"
+      company: "Blink · FIFA Club World Cup"
+      period: "Sep 2023 – Jan 2024"
+    - position: "Flight Attendant"
+      company: "Saudia Airlines"
+      period: "2019 – 2022"
+  leadership: "Yes - led cross-functional teams, managed crews of 10+, coordinated 20+ vendors"
+  remote_experience: "Yes - experience with distributed teams and remote coordination"
+
+projects:
+  - name: "F1 Saudi Arabian GP"
+    description: "Venue operations for 50,000+ attendees, reduced congestion by 25%"
+  - name: "FIFA Club World Cup"
+    description: "Overlay installation across 2 stadiums, 25% fewer incidents"
+  - name: "Riyadh Fashion Week"
+    description: "Site management, 30% faster setup through crew restructuring"
+  - name: "Neom Beach Games"
+    description: "Site management for Vision 2030 flagship project"
+
+skills:
+  hard_skills:
+    - "Operations Management"
+    - "Project Management"
+    - "Vendor Coordination"
+    - "Process Optimization"
+    - "Stakeholder Management"
+    - "Event Operations"
+    - "Site Management"
+    - "Logistics Coordination"
+    - "Budget Management"
+    - "AutoCAD (layout compliance)"
+    - "BOQ Analysis"
+    - "Risk Management"
+    - "Data Analysis"
+    - "Workflow Automation"
+    - "AI Tools"
+  soft_skills:
+    - "Leadership"
+    - "Cross-functional Collaboration"
+    - "Problem Solving"
+    - "Communication"
+    - "Adaptability"
+    - "Decision Making Under Pressure"
+
+salary_expectations:
+  salary_range_usd: "50,000 - 80,000"
+  currency: "USD or SAR equivalent"
+  negotiable: "Yes, open to discussion based on role and benefits"
+
+languages:
+  - language: "Arabic"
+    proficiency: "Native"
+  - language: "English"
+    proficiency: "Fluent"
+
+availability:
+  notice_period: "Immediately available"
+  start_date: "Immediate"

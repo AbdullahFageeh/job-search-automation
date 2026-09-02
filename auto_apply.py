@@ -18,6 +18,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from browser_config import COMET_PATH, COMET_PROFILE, USE_COMET, get_user_agent
 from resume_matcher import load_resume, score_resume
 
+# Try to import AI answerer (requires OPENAI_API_KEY)
+try:
+    from ai_answerer import AIAnswerer
+    HAS_AI_ANSWERER = True
+except ImportError:
+    HAS_AI_ANSWERER = False
+
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
 
@@ -129,6 +136,96 @@ def auto_apply(max_jobs=10):
                     apply_button.click()
                     print("   → Clicked Easy Apply")
                     time.sleep(2)
+                    
+                    # Initialize AI answerer if available
+                    ai = None
+                    if HAS_AI_ANSWERER:
+                        api_key = os.getenv("OPENAI_API_KEY")
+                        if api_key:
+                            ai = AIAnswerer(api_key)
+                            ai.set_job(job.get("company", ""), job.get("description", ""))
+                    
+                    # Try to fill application form with AI answers
+                    if ai:
+                        try:
+                            print("   → Filling application form with AI...")
+                            
+                            # Fill text inputs
+                            text_inputs = page.locator("input[type='text'], input[type='email'], input[type='tel'], input[type='number'], textarea")
+                            for input_el in text_inputs.all():
+                                try:
+                                    placeholder = input_el.get_attribute("placeholder") or ""
+                                    label = input_el.get_attribute("aria-label") or ""
+                                    name = input_el.get_attribute("name") or ""
+                                    
+                                    # Skip already filled fields
+                                    current_value = input_el.input_value()
+                                    if current_value and len(current_value) > 2:
+                                        continue
+                                    
+                                    # Determine question context
+                                    question = label or placeholder or name
+                                    if question and len(question) > 3:
+                                        # Skip file uploads and specific fields
+                                        input_type = input_el.get_attribute("type") or "text"
+                                        if input_type in ["file"]:
+                                            continue
+                                        
+                                        # Get AI answer based on field type
+                                        if "email" in question.lower() or "@email" in str(name).lower():
+                                            answer = "AbdullahFageeh@gmail.com"
+                                        elif "phone" in question.lower() or "tel" in str(name).lower():
+                                            answer = "+966 595 266 637"
+                                        elif "linkedin" in question.lower() or "profile" in question.lower():
+                                            answer = "https://linkedin.com/in/abdullah-fageeh"
+                                        elif "years" in question.lower() or "how long" in question.lower():
+                                            answer = ai.answer_numeric(question)
+                                        else:
+                                            answer = ai.answer_text(question)
+                                        
+                                        # Fill the field
+                                        input_el.fill(answer)
+                                        print(f"      • Filled: {question[:40]}...")
+                                        time.sleep(0.5)
+                                except:
+                                    continue
+                            
+                            # Handle dropdowns/selects
+                            selects = page.locator("select, [role='listbox']")
+                            for select_el in selects.all():
+                                try:
+                                    label = select_el.get_attribute("aria-label") or ""
+                                    if label and len(label) > 3:
+                                        # Get options
+                                        options = page.locator(f"select[aria-label='{label}'] option").all_text_contents()
+                                        if options and len(options) > 1:
+                                            answer = ai.answer_choice(label, options)
+                                            select_el.select_option(label=answer)
+                                            print(f"      • Selected: {label[:40]}... → {answer}")
+                                            time.sleep(0.5)
+                                except:
+                                    continue
+                            
+                            # Handle radio buttons for common questions
+                            radio_labels = page.locator("label:has(input[type='radio'])")
+                            for radio_label in radio_labels.all():
+                                try:
+                                    label_text = radio_label.inner_text()
+                                    if len(label_text) > 3 and len(label_text) < 200:
+                                        # Check if already checked
+                                        if "checked" in radio_label.get_attribute("class") or radio_label.locator("input[type='radio']").is_checked():
+                                            continue
+                                        # Use AI to decide
+                                        question = label_text
+                                        answer = ai.answer_text(f"Choose: {label_text}")
+                                        if answer.lower() in label_text.lower():
+                                            radio_label.click()
+                                            print(f"      • Selected: {label_text[:40]}...")
+                                            time.sleep(0.5)
+                                except:
+                                    continue
+                        except Exception as e:
+                            print(f"      ⚠️  AI form filling error: {e}")
                     
                     # Try to upload resume
                     try:

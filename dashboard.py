@@ -109,9 +109,10 @@ def dashboard():
     print(f"  {YELLOW}30.{RESET} 🆕 Export applications to CSV")
     print(f"  {YELLOW}31.{RESET} 🆕 Clean AI Watermarks from files")
     print(f"  {YELLOW}32.{RESET} 🆕 Scan all cover letters for AI marks")
+    print(f"  {YELLOW}33.{RESET} 🆕 AI Answerer (Test / Manage cache)")
     print(f"  {YELLOW}0.{RESET} Exit")
     
-    return input("\nChoose action (0-30): ")
+    return input("\nChoose action (0-33): ")
 
 def run_linkedin():
     print(f"\n{GREEN}Starting LinkedIn automation...{RESET}")
@@ -577,7 +578,30 @@ def main():
         elif action == "32":
             print("\n🔍 Scanning all cover letters for AI watermarks...")
             os.system("python3 clean_output.py scan cover_letters/")
-        
+
+        elif action == "33":
+            print("\n🤖 AI Application Answerer")
+            print("=" * 40)
+            print("  1. Test: Answer a sample question")
+            print("  2. Test: Score job suitability")
+            print("  3. Test: Generate cover letter for a job")
+            print("  4. View cached answers")
+            print("  5. Clear answer cache")
+            sub = input("\n  Choice (1-5): ").strip()
+            if sub == "1":
+                q = input("  Enter question: ").strip()
+                os.system(f"python3 ai_answerer.py answer '{q}'")
+            elif sub == "2":
+                idx = input("  Job index (from entry_level_jobs.json): ").strip() or "0"
+                os.system(f"python3 ai_answerer.py suitability --index {idx}")
+            elif sub == "3":
+                idx = input("  Job index (from entry_level_jobs.json): ").strip() or "0"
+                os.system(f"python3 ai_answerer.py cover_letter --index {idx}")
+            elif sub == "4":
+                os.system("python3 ai_answerer.py cache show")
+            elif sub == "5":
+                os.system("python3 ai_answerer.py cache clear")
+
         else:
             print(f"\n{RED}Invalid action. Try again.{RESET}")
         
