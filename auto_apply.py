@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 Auto-Apply Engine — Fully automated job application pipeline.
-Uses Comet browser for stealth, resume matcher for scoring, and LinkedIn Easy Apply.
+Uses Comet browser with saved profile (inherits LinkedIn login).
 """
 
 import json
+import os
 import time
 import sys
 from pathlib import Path
@@ -14,7 +15,7 @@ from dotenv import load_dotenv
 
 # Import shared modules
 sys.path.insert(0, str(Path(__file__).parent))
-from browser_config import get_browser_options, get_user_agent, is_comet_available
+from browser_config import COMET_PATH, COMET_PROFILE, USE_COMET, get_user_agent
 from resume_matcher import load_resume, score_resume
 
 BASE_DIR = Path(__file__).parent
@@ -26,14 +27,14 @@ LINKEDIN_PASSWORD = os.getenv("LINKEDIN_PASSWORD", "@Bodi9090")
 
 # Resume mapping
 RESUME_MAP = {
-    "ladders": "resumes/Ladders_BizOps.md",
-    "swooped": "resumes/Swooped_BizOps.md",
-    "point.me": "resumes/point.me_BizOps.md",
-    "motivate": "resumes/Motive_BizOps.md",
-    "outer signal": "resumes/OuterSignal_BizOps.md",
-    "whatnot": "resumes/Whatnot_StrategyOps.md",
-    "gitlab": "resumes/GitLab_CS_Ops.md",
-    "default": "resumes/Operations_Coordinator.md",
+    "ladders": "resumes/Abdullah_Fageeh_Resume_Ladders_BizOps.md",
+    "swooped": "resumes/Abdullah_Fageeh_Resume_Swooped_BizOps.md",
+    "point.me": "resumes/Abdullah_Fageeh_Resume_point.me_BizOps.md",
+    "motive": "resumes/Abdullah_Fageeh_Resume_Motive_BizOps.md",
+    "outer signal": "resumes/Abdullah_Fageeh_Resume_OuterSignal_BizOps.md",
+    "whatnot": "resumes/Abdullah_Fageeh_Resume_Whatnot_StrategyOps.md",
+    "gitlab": "resumes/Abdullah_Fageeh_Resume_GitLab_CS_Ops.md",
+    "default": "resumes/Abdullah_Fageeh_Resume.md",
 }
 
 def get_resume_for_company(company_name):
@@ -42,96 +43,31 @@ def get_resume_for_company(company_name):
     for key, path in RESUME_MAP.items():
         if key in company_lower:
             return BASE_DIR / path
-    return BASE_DIR / RESUME_MAP["default"]
+    # Try to find PDF
+    for key, path in RESUME_MAP.items():
+        pdf_path = path.replace(".md", ".pdf")
+        if Path(pdf_path).exists():
+            if key in company_lower:
+                return Path(pdf_path)
+    # Fallback to first existing resume
+    for p in RESUME_MAP.values():
+        if Path(p).exists():
+            pdf = p.replace(".md", ".pdf")
+            if Path(pdf).exists():
+                return Path(pdf)
+            return Path(p)
+    return BASE_DIR / "resumes/Abdullah_Fageeh_Resume.md"
 
-def login_linkedin(page):
-    """Login to LinkedIn with Comet browser."""
-    print("🔐 Logging into LinkedIn...")
-    page.goto("https://www.linkedin.com/login", timeout=60000)
-    time.sleep(3)
-    
-    try:
-        # Enter credentials
-        page.fill('input[name="session_key"]', LINKEDIN_EMAIL)
-        page.fill('input[name="password"]', LINKEDIN_PASSWORD)
-        page.click('button[type="submit"]')
-        page.wait_for_load_state("networkidle", timeout=30000)
-        print("✅ LinkedIn login successful")
-        return True
-    except Exception as e:
-        print(f"⚠️ Login may need manual intervention: {e}")
-        print("👉 Please complete login manually in the browser window")
-        input("Press Enter after you've logged in...")
-        return True
-
-def check_application_success(page):
-    """Check if application was submitted successfully."""
-    try:
-        # LinkedIn shows success page or stays on job page
-        if "apply" in page.url().lower() and "saved" in page.url().lower():
-            return True
-        if page.is_visible("text=Application submitted", timeout=5000):
-            return True
-        if page.is_visible("text=You applied", timeout=5000):
-            return True
-        # If URL changed away from apply page, likely success
-        if "apply" not in page.url().lower():
-            return True
-        return False
-    except:
-        return False
-
-def apply_to_job_easy(page, job_url, resume_path):
-    """Apply to a job via LinkedIn Easy Apply using Comet browser."""
-    print(f"   📝 Applying: {job_url}")
-    page.goto(job_url, timeout=30000)
-    time.sleep(3)
-    
-    try:
-        # Click Easy Apply button
-        page.click('button[aria-label*="Easy Apply"]', timeout=10000)
-        time.sleep(2)
-        
-        # Upload resume if upload field exists
-        if page.is_visible("input[type='file']", timeout=3000):
-            page.set_input_files("input[type='file']", str(resume_path))
-            time.sleep(2)
-        
-        # Try to fill common fields
-        for selector in ["input[placeholder*='phone']", "input[name*='phone']"]:
-            if page.is_visible(selector, timeout=1000):
-                page.fill(selector, "+1234567890")
-                break
-        
-        # Click submit
-        for selector in [
-            'button[aria-label*="Submit"]',
-            'button[type="submit"]',
-            'button:has-text("Submit application")',
-            'button:has-text("Submit")',
-        ]:
-            if page.is_visible(selector, timeout=2000):
-                page.click(selector)
-                time.sleep(3)
-                break
-        
-        success = check_application_success(page)
-        return "Applied" if success else "Unknown"
-        
-    except Exception as e:
-        print(f"   ⚠️ Application issue: {e}")
-        return "Failed"
-
-def auto_apply(max_jobs=10, days_old=30):
-    """Auto-apply to entry-level jobs."""
+def auto_apply(max_jobs=10):
+    """Auto-apply to entry-level jobs using Comet browser with saved login."""
     print(f"🚀 Auto-Apply Engine Starting...")
-    print(f"   Comet Browser: {'✅' if is_comet_available() else '❌'}")
+    print(f"   Comet Browser: {'✅' if USE_COMET else '❌'}")
     print(f"   Max applications: {max_jobs}")
     
     # Load jobs
     jobs_file = BASE_DIR / "logs" / "entry_level_jobs.json"
     if not jobs_file.exists():
-        print("❌ No jobs found. Run entry_level_jobs.py first.")
+        print("❌ No jobs found. Run entry_level_jobs.py scan first.")
         return
     
     with open(jobs_file) as f:
@@ -155,35 +91,123 @@ def auto_apply(max_jobs=10, days_old=30):
     
     print(f"📋 Found {len(new_jobs)} new jobs to apply to\n")
     
-    # Launch Comet browser (headed for stealth)
-    with sync_playwright() as p:
-        browser = p.chromium.launch(**get_browser_options(headless=False, slow_mo=100))
-        context = browser.new_context(user_agent=get_user_agent())
-        page = context.new_page()
+    # Launch Comet with persistent context (inherits LinkedIn login!)
+    p = sync_playwright().start()
+    context = p.chromium.launch_persistent_context(
+        user_data_dir=COMET_PROFILE,
+        executable_path=COMET_PATH,
+        headless=False,
+        slow_mo=50,
+        user_agent=get_user_agent(),
+    )
+    page = context.new_page()
+    
+    # Check if already logged in
+    page.goto("https://www.linkedin.com", timeout=30000)
+    time.sleep(2)
+    
+    if "sign-in" in page.url.lower() or "login" in page.title().lower():
+        print("⚠️  Not logged in to LinkedIn")
+        print("   Please login manually in the browser window...")
+        input("Press Enter after you've logged in...")
+    
+    results = []
+    for i, job in enumerate(new_jobs, 1):
+        print(f"\n[{i}/{len(new_jobs)}] {job['title']} at {job.get('company', 'Unknown')}")
         
-        # Login
-        login_linkedin(page)
+        resume_path = get_resume_for_company(job.get("company", ""))
         
-        results = []
-        for i, job in enumerate(new_jobs, 1):
-            print(f"\n[{i}/{len(new_jobs)}] {job['title']} at {job['company']}")
+        try:
+            page.goto(job["link"], timeout=30000)
+            time.sleep(3)
             
-            resume_path = get_resume_for_company(job["company"])
-            result = apply_to_job_easy(page, job["link"], resume_path)
-            print(f"   → {result}")
+            # Look for Easy Apply button
+            try:
+                # Try multiple selectors for Easy Apply
+                apply_button = page.locator('[data-control-name="continue_apply_click"]').first
+                if apply_button.is_visible(timeout=5000):
+                    apply_button.click()
+                    print("   → Clicked Easy Apply")
+                    time.sleep(2)
+                    
+                    # Try to upload resume
+                    try:
+                        file_input = page.locator("input[type='file']").first
+                        if file_input.is_visible(timeout=3000):
+                            file_input.set_input_files(str(resume_path))
+                            print(f"   → Uploaded resume: {resume_path.name}")
+                            time.sleep(2)
+                    except:
+                        pass  # Resume might already be filled
+                    
+                    # Try to submit
+                    try:
+                        submit = page.locator('button[type="submit"], button:has-text("Submit"), button:has-text("Review application")').first
+                        if submit.is_visible(timeout=3000):
+                            submit.click()
+                            print("   → Submitted!")
+                            results.append({
+                                "title": job["title"],
+                                "company": job.get("company", ""),
+                                "link": job["link"],
+                                "result": "Applied",
+                                "date": datetime.now().strftime("%Y-%m-%d"),
+                                "resume_used": str(resume_path),
+                            })
+                        else:
+                            print("   → Manual review needed")
+                            results.append({
+                                "title": job["title"],
+                                "company": job.get("company", ""),
+                                "link": job["link"],
+                                "result": "Manual Review",
+                                "date": datetime.now().strftime("%Y-%m-%d"),
+                                "resume_used": str(resume_path),
+                            })
+                    except:
+                        print("   → No submit button found")
+                        results.append({
+                            "title": job["title"],
+                            "company": job.get("company", ""),
+                            "link": job["link"],
+                            "result": "Needs Attention",
+                            "date": datetime.now().strftime("%Y-%m-%d"),
+                            "resume_used": str(resume_path),
+                        })
+                else:
+                    print("   → No Easy Apply button (may need manual application)")
+                    results.append({
+                        "title": job["title"],
+                        "company": job.get("company", ""),
+                        "link": job["link"],
+                        "result": "No Easy Apply",
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                    })
+            except Exception as e:
+                print(f"   → Error: {e}")
+                results.append({
+                    "title": job["title"],
+                    "company": job.get("company", ""),
+                    "link": job["link"],
+                    "result": "Error",
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                })
             
+            # Human-like delay
+            time.sleep(3 + i)
+            
+        except Exception as e:
+            print(f"   → Failed: {e}")
             results.append({
                 "title": job["title"],
-                "company": job["company"],
+                "company": job.get("company", ""),
                 "link": job["link"],
-                "result": result,
+                "result": "Failed",
                 "date": datetime.now().strftime("%Y-%m-%d"),
-                "resume_used": str(resume_path),
             })
-            
-            time.sleep(5 + i)  # Increasing delay for stealth
-        
-        browser.close()
+    
+    context.close()
+    p.stop()
     
     # Save results
     if applied_file.exists():
@@ -199,8 +223,8 @@ def auto_apply(max_jobs=10, days_old=30):
     success = sum(1 for r in results if r["result"] == "Applied")
     print(f"\n{'='*50}")
     print(f"🏁 Applications Complete!")
-    print(f"   ✅ Successful: {success}")
-    print(f"   ❌ Failed/Unknown: {len(results) - success}")
+    print(f"   ✅ Applied: {success}")
+    print(f"   ⚠️  Manual/Other: {len(results) - success}")
     print(f"   💾 Saved to {applied_file}")
 
 if __name__ == "__main__":
