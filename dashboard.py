@@ -550,6 +550,33 @@ def main():
         elif action == "30":
             print("\n📤 Exporting applications to CSV...")
             os.system("python3 analytics_dashboard.py export")
+
+        elif action == "31":
+            print("\n🧹 AI Watermark Cleaner")
+            print("="*40)
+            print("  1. Scan a file for AI watermarks")
+            print("  2. Clean a file of AI watermarks")
+            print("  3. Clean all cover letters")
+            print("  4. Clean all resumes")
+            print("  5. Pre-send check (scan + auto-clean)")
+            sub = input("\n  Choice (1-5): ").strip()
+            if sub == "1":
+                path = input("  File path: ").strip()
+                os.system(f"python3 clean_output.py scan '{path}'")
+            elif sub == "2":
+                path = input("  File path: ").strip()
+                os.system(f"python3 clean_output.py clean '{path}'")
+            elif sub == "3":
+                os.system("python3 clean_output.py clean cover_letters/")
+            elif sub == "4":
+                os.system("python3 clean_output.py clean resumes/")
+            elif sub == "5":
+                path = input("  File to send: ").strip()
+                os.system(f"python3 clean_output.py pre-send '{path}'")
+
+        elif action == "32":
+            print("\n🔍 Scanning all cover letters for AI watermarks...")
+            os.system("python3 clean_output.py scan cover_letters/")
         
         else:
             print(f"\n{RED}Invalid action. Try again.{RESET}")

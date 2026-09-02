@@ -343,7 +343,7 @@ def main():
 
         while True:
             try:
-                check_new_jobs(args.channels, skip_linkedin=True)
+                check_new_jobs(channels=args.channels, skip_linkedin=True)
                 print(f"⏳ Next scan in {args.interval} minutes...")
                 time.sleep(args.interval * 60)
             except KeyboardInterrupt:
