@@ -86,83 +86,12 @@ def is_saudi_arabia_job(job):
     """Check if job is located in Saudi Arabia."""
     location = job.get("location", "").lower()
     title = job.get("title", "").lower()
-    sa_keywords = [
-        "saudi arabia", "saudi", "riyadh", "jeddah", "dammam",
-        "ksa", "tabuk", "khobar", "duba", "al khobar", "medina", "makkah", "mecca",
-    ]
-    return any(kw in location for kw in sa_keywords) or any(kw in title for kw in sa_keywords)
+    sa_kw = ["saudi arabia", "saudi", "riyadh", "jeddah", "dammam",
+             "ksa", "tabuk", "khobar", "duba", "al khobar", "medina", "makkah", "mecca"]
+    return any(kw in location for kw in sa_kw) or any(kw in title for kw in sa_kw)
+
 
 def auto_apply(max_jobs=10):
-    """Auto-apply to REMOTE + SAUDI ARABIA ops jobs."""
-    print(f"🚀 Auto-Apply Engine Starting...")
-    print(f"   Comet Browser: {'✅' if USE_COMET else '❌'}")
-    print(f"   Max applications: {max_jobs}")
-    print("   Filter: REMOTE + SAUDI ARABIA ON-SITE + ENTRY LEVEL OPS")
-    
-    # Load jobs
-    jobs_file = BASE_DIR / "logs" / "entry_level_jobs.json"
-    if not jobs_file.exists():
-        print("❌ No jobs found. Run: python3 entry_level_jobs.py scan 50")
-        return
-    
-    with open(jobs_file) as f:
-        jobs = json.load(f)
-    
-    # Also load Saudi Arabia jobs
-    sa_file = BASE_DIR / "logs" / "saudi_jobs.json"
-    sa_jobs = []
-    if sa_file.exists():
-        with open(sa_file) as f:
-            sa_jobs = json.load(f)
-    
-    # Combine and deduplicate
-    all_jobs = {}
-    for j in jobs + sa_jobs:
-        all_jobs[j["link"]] = j
-    
-    # Filter: remote OR saudi arabia (all levels accepted)
-    eligible = [j for j in all_jobs.values() if is_remote_job(j) or is_saudi_arabia_job(j)]
-    remote_count = sum(1 for j in all_jobs.values() if is_remote_job(j) and not is_saudi_arabia_job(j))
-    sa_count = sum(1 for j in all_jobs.values() if is_saudi_arabia_job(j))
-    
-    # Entry-level indicator keywords for prioritization
-    entry_keywords = [
-        "entry level", "entry-level", "entrylevel", "junior", "associate",
-        "coordinator", "analyst", "specialist", "assistant", "intern",
-        "trainee", "graduate", "new grad", "new-grad", "recent grad",
-        "no experience", "0-1", "0-2", "0-3 years", "0-5 years",
-        "1-2", "1-3", "up to 2", "up to 3", "fresh grad", "2027", "2026",
-    ]
-    
-    # Sort: entry-level first, then others (fallback)
-    def is_entry_level(j):
-        text = (j.get("title", "") + " " + j.get("company", "")).lower()
-        return any(kw in text for kw in entry_keywords)
-    
-    eligible.sort(key=lambda j: 0 if is_entry_level(j) else 1)
-    
-    entry_count = sum(1 for j in eligible if is_entry_level(j))
-    other_count = len(eligible) - entry_count
-    
-    print(f"📊 Total jobs: {len(all_jobs)}")
-    print(f"   Remote: {remote_count}, Saudi Arabia: {sa_count}")
-    print(f"   Entry-level: {entry_count}, Other levels: {other_count}")
-    print(f"   Eligible: {len(eligible)} (entry-level prioritized first)")
-    
-    # Load already applied
-    applied_file = BASE_DIR / "logs" / "linkedin_applied.json"
-    applied = []
-    if applied_file.exists():
-        with open(applied_file) as f:
-            applied = json.load(f)
-    applied_links = {a.get("link", "") for a in applied}
-    
-    # Filter new jobs (entry-level first, then fallback to other levels)
-    new_jobs = [j for j in eligible if j["link"] not in applied_links]
-    new_jobs = new_jobs[:max_jobs]
-    
-    if not new_jobs:
-        print("✅ No new jobs to apply to!")
     """Auto-apply to ENTRY-LEVEL REMOTE jobs using Comet browser with saved login."""
     print(f"🚀 Auto-Apply Engine Starting...")
     print(f"   Comet Browser: {'✅' if USE_COMET else '❌'}")
@@ -232,149 +161,174 @@ def auto_apply(max_jobs=10):
             page.goto(job["link"], timeout=30000)
             time.sleep(3)
             
-            # Look for Easy Apply button
-            try:
-                # Try multiple selectors for Easy Apply
-                apply_button = page.locator('[data-control-name="continue_apply_click"]').first
-                if apply_button.is_visible(timeout=5000):
-                    apply_button.click()
-                    print("   → Clicked Easy Apply")
-                    time.sleep(2)
-                    
-                    # Initialize AI answerer if available
-                    ai = None
-                    if HAS_AI_ANSWERER:
-                        api_key = os.getenv("OPENAI_API_KEY")
-                        if api_key:
-                            ai = AIAnswerer(api_key)
-                            ai.set_job(job.get("company", ""), job.get("description", ""))
-                    
-                    # Try to fill application form with AI answers
-                    if ai:
-                        try:
-                            print("   → Filling application form with AI...")
-                            
-                            # Fill text inputs
-                            text_inputs = page.locator("input[type='text'], input[type='email'], input[type='tel'], input[type='number'], textarea")
-                            for input_el in text_inputs.all():
-                                try:
-                                    placeholder = input_el.get_attribute("placeholder") or ""
-                                    label = input_el.get_attribute("aria-label") or ""
-                                    name = input_el.get_attribute("name") or ""
-                                    
-                                    # Skip already filled fields
-                                    current_value = input_el.input_value()
-                                    if current_value and len(current_value) > 2:
+            # Look for Easy Apply button (try multiple selectors)
+            apply_button = None
+            for sel in [
+                'button[data-control-name="apply_button"]',
+                'button[data-control-name="continue_apply_click"]',
+                'button:has-text("Easy Apply")',
+                'button:has-text("Apply")',
+            ]:
+                try:
+                    btn = page.locator(sel).first
+                    if btn.is_visible(timeout=1000):
+                        apply_button = btn
+                        print("   → Found button")
+                        break
+                except:
+                    continue
+            
+            if apply_button:
+                apply_button.click()
+                print("   → Clicked Easy Apply")
+                time.sleep(3)
+                
+                # Check if redirected to external site
+                if "apply" not in page.url and "job" not in page.url:
+                    print("   → Redirected externally (skipping)")
+                    results.append({
+                        "title": job["title"],
+                        "company": job.get("company", ""),
+                        "link": job["link"],
+                        "result": "External Application",
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                    })
+                    continue
+                
+                # Initialize AI answerer if available
+                ai = None
+                if HAS_AI_ANSWERER:
+                    api_key = os.getenv("OPENAI_API_KEY")
+                    if api_key:
+                        ai = AIAnswerer(api_key)
+                        ai.set_job(job.get("company", ""), job.get("description", ""))
+                
+                # Try to fill application form with AI answers
+                if ai:
+                    try:
+                        print("   → Filling application form with AI...")
+                        
+                        # Fill text inputs
+                        text_inputs = page.locator("input[type='text'], input[type='email'], input[type='tel'], input[type='number'], textarea")
+                        for input_el in text_inputs.all():
+                            try:
+                                placeholder = input_el.get_attribute("placeholder") or ""
+                                label = input_el.get_attribute("aria-label") or ""
+                                name = input_el.get_attribute("name") or ""
+                                
+                                # Skip already filled fields
+                                current_value = input_el.input_value()
+                                if current_value and len(current_value) > 2:
+                                    continue
+                                
+                                # Determine question context
+                                question = label or placeholder or name
+                                if question and len(question) > 3:
+                                    # Skip file uploads and specific fields
+                                    input_type = input_el.get_attribute("type") or "text"
+                                    if input_type in ["file"]:
                                         continue
                                     
-                                    # Determine question context
-                                    question = label or placeholder or name
-                                    if question and len(question) > 3:
-                                        # Skip file uploads and specific fields
-                                        input_type = input_el.get_attribute("type") or "text"
-                                        if input_type in ["file"]:
-                                            continue
-                                        
-                                        # Get AI answer based on field type
-                                        if "email" in question.lower() or "@email" in str(name).lower():
-                                            answer = "AbdullahFageeh@gmail.com"
-                                        elif "phone" in question.lower() or "tel" in str(name).lower():
-                                            answer = "+966 595 266 637"
-                                        elif "linkedin" in question.lower() or "profile" in question.lower():
-                                            answer = "https://linkedin.com/in/abdullah-fageeh"
-                                        elif "years" in question.lower() or "how long" in question.lower():
-                                            answer = ai.answer_numeric(question)
-                                        else:
-                                            answer = ai.answer_text(question)
-                                        
-                                        # Fill the field
-                                        input_el.fill(answer)
-                                        print(f"      • Filled: {question[:40]}...")
+                                    # Get AI answer based on field type
+                                    if "email" in question.lower() or "@email" in str(name).lower():
+                                        answer = "AbdullahFageeh@gmail.com"
+                                    elif "phone" in question.lower() or "tel" in str(name).lower():
+                                        answer = "+966 595 266 637"
+                                    elif "linkedin" in question.lower() or "profile" in question.lower():
+                                        answer = "https://linkedin.com/in/abdullah-fageeh"
+                                    elif "years" in question.lower() or "how long" in question.lower():
+                                        answer = ai.answer_numeric(question)
+                                    else:
+                                        answer = ai.answer_text(question)
+                                    
+                                    # Fill the field
+                                    input_el.fill(answer)
+                                    print(f"      • Filled: {question[:40]}...")
+                                    time.sleep(0.5)
+                            except:
+                                continue
+                        
+                        # Handle dropdowns/selects
+                        selects = page.locator("select, [role='listbox']")
+                        for select_el in selects.all():
+                            try:
+                                label = select_el.get_attribute("aria-label") or ""
+                                if label and len(label) > 3:
+                                    # Get options
+                                    options = page.locator(f"select[aria-label='{label}'] option").all_text_contents()
+                                    if options and len(options) > 1:
+                                        answer = ai.answer_choice(label, options)
+                                        select_el.select_option(label=answer)
+                                        print(f"      • Selected: {label[:40]}... → {answer}")
                                         time.sleep(0.5)
-                                except:
-                                    continue
-                            
-                            # Handle dropdowns/selects
-                            selects = page.locator("select, [role='listbox']")
-                            for select_el in selects.all():
-                                try:
-                                    label = select_el.get_attribute("aria-label") or ""
-                                    if label and len(label) > 3:
-                                        # Get options
-                                        options = page.locator(f"select[aria-label='{label}'] option").all_text_contents()
-                                        if options and len(options) > 1:
-                                            answer = ai.answer_choice(label, options)
-                                            select_el.select_option(label=answer)
-                                            print(f"      • Selected: {label[:40]}... → {answer}")
-                                            time.sleep(0.5)
-                                except:
-                                    continue
-                            
-                            # Handle radio buttons for common questions
-                            radio_labels = page.locator("label:has(input[type='radio'])")
-                            for radio_label in radio_labels.all():
-                                try:
-                                    label_text = radio_label.inner_text()
-                                    if len(label_text) > 3 and len(label_text) < 200:
-                                        # Check if already checked
-                                        if "checked" in radio_label.get_attribute("class") or radio_label.locator("input[type='radio']").is_checked():
-                                            continue
-                                        # Use AI to decide
-                                        question = label_text
-                                        answer = ai.answer_text(f"Choose: {label_text}")
-                                        if answer.lower() in label_text.lower():
-                                            radio_label.click()
-                                            print(f"      • Selected: {label_text[:40]}...")
-                                            time.sleep(0.5)
-                                except:
-                                    continue
-                        except Exception as e:
-                            print(f"      ⚠️  AI form filling error: {e}")
+                            except:
+                                continue
+                        
+                        # Handle radio buttons for common questions
+                        radio_labels = page.locator("label:has(input[type='radio'])")
+                        for radio_label in radio_labels.all():
+                            try:
+                                label_text = radio_label.inner_text()
+                                if len(label_text) > 3 and len(label_text) < 200:
+                                    # Check if already checked
+                                    if "checked" in radio_label.get_attribute("class") or radio_label.locator("input[type='radio']").is_checked():
+                                        continue
+                                    # Use AI to decide
+                                    question = label_text
+                                    answer = ai.answer_text(f"Choose: {label_text}")
+                                    if answer.lower() in label_text.lower():
+                                        radio_label.click()
+                                        print(f"      • Selected: {label_text[:40]}...")
+                                        time.sleep(0.5)
+                            except:
+                                continue
+                    except Exception as e:
+                        print(f"      ⚠️  AI form filling error: {e}")
                     
-                    # Try to upload resume
-                    try:
-                        file_input = page.locator("input[type='file']").first
-                        if file_input.is_visible(timeout=3000):
-                            file_input.set_input_files(str(resume_path))
-                            print(f"   → Uploaded resume: {resume_path.name}")
-                            time.sleep(2)
-                    except:
-                        pass  # Resume might already be filled
-                    
-                    # Try to submit
-                    try:
-                        submit = page.locator('button[type="submit"], button:has-text("Submit"), button:has-text("Review application")').first
-                        if submit.is_visible(timeout=3000):
-                            submit.click()
-                            print("   → Submitted!")
-                            results.append({
-                                "title": job["title"],
-                                "company": job.get("company", ""),
-                                "link": job["link"],
-                                "result": "Applied",
-                                "date": datetime.now().strftime("%Y-%m-%d"),
-                                "resume_used": str(resume_path),
-                            })
-                        else:
-                            print("   → Manual review needed")
-                            results.append({
-                                "title": job["title"],
-                                "company": job.get("company", ""),
-                                "link": job["link"],
-                                "result": "Manual Review",
-                                "date": datetime.now().strftime("%Y-%m-%d"),
-                                "resume_used": str(resume_path),
-                            })
-                    except:
-                        print("   → No submit button found")
+                # Try to upload resume
+                try:
+                    file_input = page.locator("input[type='file']").first
+                    if file_input.is_visible(timeout=3000):
+                        file_input.set_input_files(str(resume_path))
+                        print(f"   → Uploaded resume: {resume_path.name}")
+                        time.sleep(2)
+                except:
+                    pass  # Resume might already be filled
+                
+                # Try to submit
+                try:
+                    submit = page.locator('button[type="submit"], button:has-text("Submit"), button:has-text("Review application")').first
+                    if submit.is_visible(timeout=3000):
+                        submit.click()
+                        print("   → Submitted!")
                         results.append({
                             "title": job["title"],
                             "company": job.get("company", ""),
                             "link": job["link"],
-                            "result": "Needs Attention",
+                            "result": "Applied",
                             "date": datetime.now().strftime("%Y-%m-%d"),
                             "resume_used": str(resume_path),
                         })
+                    else:
+                        print("   → Manual review needed")
+                        results.append({
+                            "title": job["title"],
+                            "company": job.get("company", ""),
+                            "link": job["link"],
+                            "result": "Manual Review",
+                            "date": datetime.now().strftime("%Y-%m-%d"),
+                            "resume_used": str(resume_path),
+                        })
+                except:
+                    print("   → No submit button found")
+                    results.append({
+                        "title": job["title"],
+                        "company": job.get("company", ""),
+                        "link": job["link"],
+                        "result": "Needs Attention",
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "resume_used": str(resume_path),
+                    })
                 else:
                     print("   → No Easy Apply button (may need manual application)")
                     results.append({
