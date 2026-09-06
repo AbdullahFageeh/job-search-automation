@@ -88,6 +88,27 @@ def is_ops_relevant(title, snippet=""):
     combined = (title + " " + snippet).lower()
     return any(kw in combined for kw in TARGET_KEYWORDS)
 
+def is_remote(job_dict):
+    """Strict remote-only filter — reject any job with a physical city/location."""
+    location = job_dict.get("location", "").lower()
+    title = job_dict.get("title", "").lower()
+    # On-site keywords (hard exclude)
+    onsite_indicators = [
+        "new york", "san francisco", "san jose", "silicon valley",
+        "seattle", "boston", "chicago", "austin", "dallas", "houston",
+        "los angeles", "l.a.", "virginia", "ohio", "new jersey",
+        "miami", "denver", "atlanta", "philadelphia", "washington",
+        "pennsylvania", "massachusetts", "california", "texas", "florida",
+        "on-site", "onsite", "in office", "must be on-site",
+    ]
+    is_onsite = any(kw in location for kw in onsite_indicators)
+    # If title says on-site
+    if "on-site" in title or "onsite" in title:
+        return False
+    if is_onsite:
+        return False
+    return True
+
 def scrape_linkedin(source):
     jobs = []
     seen = load_seen()
@@ -135,7 +156,7 @@ def scrape_linkedin(source):
                         location = span.get_text(strip=True)
                         break
 
-            jobs.append({
+            job = {
                 "source": source["name"],
                 "title": title.strip(),
                 "company": company,
@@ -143,7 +164,15 @@ def scrape_linkedin(source):
                 "link": href,
                 "found_at": datetime.now().isoformat(),
                 "entry_level": True,
-            })
+            }
+            
+            # Only add truly remote jobs
+            if not is_remote(job):
+                logger.info(f"  Skipped (not remote): {title} ({location})")
+                seen.add(href)
+                continue
+            
+            jobs.append(job)
             seen.add(href)
         
         context.close()

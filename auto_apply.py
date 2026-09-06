@@ -65,20 +65,44 @@ def get_resume_for_company(company_name):
             return Path(p)
     return BASE_DIR / "resumes/Abdullah_Fageeh_Resume.md"
 
+def is_remote_job(job):
+    """Strict remote-only filter."""
+    location = job.get("location", "").lower()
+    title = job.get("title", "").lower()
+    onsite_indicators = [
+        "new york", "san francisco", "san jose", "silicon valley",
+        "seattle", "boston", "chicago", "austin", "dallas", "houston",
+        "los angeles", "l.a.", "virginia", "ohio", "new jersey",
+        "miami", "denver", "atlanta", "philadelphia", "washington",
+        "on-site", "onsite", "in office",
+    ]
+    if any(kw in location for kw in onsite_indicators):
+        return False
+    if "on-site" in title or "onsite" in title:
+        return False
+    return True
+
 def auto_apply(max_jobs=10):
-    """Auto-apply to entry-level jobs using Comet browser with saved login."""
+    """Auto-apply to ENTRY-LEVEL REMOTE jobs using Comet browser with saved login."""
     print(f"🚀 Auto-Apply Engine Starting...")
     print(f"   Comet Browser: {'✅' if USE_COMET else '❌'}")
     print(f"   Max applications: {max_jobs}")
+    print(f"   Filter: REMOTE ONLY + ENTRY LEVEL OPS\n")
     
     # Load jobs
     jobs_file = BASE_DIR / "logs" / "entry_level_jobs.json"
     if not jobs_file.exists():
-        print("❌ No jobs found. Run entry_level_jobs.py scan first.")
+        print("❌ No jobs found. Run: python3 entry_level_jobs.py scan 50")
         return
     
     with open(jobs_file) as f:
         jobs = json.load(f)
+    
+    # Filter: REMOTE ONLY
+    remote_jobs = [j for j in jobs if is_remote_job(j)]
+    print(f"📊 Total jobs: {len(jobs)}, Remote only: {len(remote_jobs)}")
+    if len(jobs) - len(remote_jobs) > 0:
+        print(f"   ⚠️  Filtered out {len(jobs) - len(remote_jobs)} on-site jobs\n")
     
     # Load already applied
     applied_file = BASE_DIR / "logs" / "linkedin_applied.json"
@@ -88,8 +112,8 @@ def auto_apply(max_jobs=10):
             applied = json.load(f)
     applied_links = {a.get("link", "") for a in applied}
     
-    # Filter new jobs
-    new_jobs = [j for j in jobs if j["link"] not in applied_links]
+    # Filter new jobs (remote + not yet applied)
+    new_jobs = [j for j in remote_jobs if j["link"] not in applied_links]
     new_jobs = new_jobs[:max_jobs]
     
     if not new_jobs:

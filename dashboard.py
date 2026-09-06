@@ -110,9 +110,10 @@ def dashboard():
     print(f"  {YELLOW}31.{RESET} 🆕 Clean AI Watermarks from files")
     print(f"  {YELLOW}32.{RESET} 🆕 Scan all cover letters for AI marks")
     print(f"  {YELLOW}33.{RESET} 🆕 AI Answerer (Test / Manage cache)")
+    print(f"  {YELLOW}34.{RESET} 🆕 LangGraph Pipeline (Multi-agent)")
     print(f"  {YELLOW}0.{RESET} Exit")
     
-    return input("\nChoose action (0-33): ")
+    return input("\nChoose action (0-34): ")
 
 def run_linkedin():
     print(f"\n{GREEN}Starting LinkedIn automation...{RESET}")
@@ -601,6 +602,27 @@ def main():
                 os.system("python3 ai_answerer.py cache show")
             elif sub == "5":
                 os.system("python3 ai_answerer.py cache clear")
+
+        elif action == "34":
+            print("\n🤖 LangGraph Multi-Agent Pipeline")
+            print("=" * 40)
+            print("  1. Run pipeline (interactive — approve each)")
+            print("  2. Run pipeline (auto-approve, 5 jobs)")
+            print("  3. Run pipeline (auto-approve, 10 jobs)")
+            print("  4. View pipeline status / results")
+            print("  5. View graph structure")
+            sub = input("\n  Choice (1-5): ").strip()
+            if sub == "1":
+                n = input("  Max jobs (default 5): ").strip() or "5"
+                os.system(f"python3 langgraph_pipeline.py run --max-jobs {n}")
+            elif sub == "2":
+                os.system("python3 langgraph_pipeline.py run --max-jobs 5 --auto-approve")
+            elif sub == "3":
+                os.system("python3 langgraph_pipeline.py run --max-jobs 10 --auto-approve")
+            elif sub == "4":
+                os.system("python3 langgraph_pipeline.py status")
+            elif sub == "5":
+                os.system("python3 langgraph_pipeline.py graph")
 
         else:
             print(f"\n{RED}Invalid action. Try again.{RESET}")
