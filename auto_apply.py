@@ -93,6 +93,56 @@ def is_saudi_arabia_job(job):
     return any(kw in location for kw in sa_keywords) or any(kw in title for kw in sa_keywords)
 
 def auto_apply(max_jobs=10):
+    """Auto-apply to REMOTE + SAUDI ARABIA ops jobs."""
+    print(f"🚀 Auto-Apply Engine Starting...")
+    print(f"   Comet Browser: {'✅' if USE_COMET else '❌'}")
+    print(f"   Max applications: {max_jobs}")
+    print("   Filter: REMOTE + SAUDI ARABIA ON-SITE + ENTRY LEVEL OPS")
+    
+    # Load jobs
+    jobs_file = BASE_DIR / "logs" / "entry_level_jobs.json"
+    if not jobs_file.exists():
+        print("❌ No jobs found. Run: python3 entry_level_jobs.py scan 50")
+        return
+    
+    with open(jobs_file) as f:
+        jobs = json.load(f)
+    
+    # Also load Saudi Arabia jobs
+    sa_file = BASE_DIR / "logs" / "saudi_jobs.json"
+    sa_jobs = []
+    if sa_file.exists():
+        with open(sa_file) as f:
+            sa_jobs = json.load(f)
+    
+    # Combine and deduplicate
+    all_jobs = {}
+    for j in jobs + sa_jobs:
+        all_jobs[j["link"]] = j
+    
+    # Filter: remote OR saudi arabia
+    eligible = [j for j in all_jobs.values() if is_remote_job(j) or is_saudi_arabia_job(j)]
+    remote_count = sum(1 for j in all_jobs.values() if is_remote_job(j) and not is_saudi_arabia_job(j))
+    sa_count = sum(1 for j in all_jobs.values() if is_saudi_arabia_job(j))
+    
+    print(f"📊 Total jobs: {len(all_jobs)}")
+    print(f"   Remote: {remote_count}, Saudi Arabia: {sa_count}")
+    print(f"   Eligible: {len(eligible)}")
+    
+    # Load already applied
+    applied_file = BASE_DIR / "logs" / "linkedin_applied.json"
+    applied = []
+    if applied_file.exists():
+        with open(applied_file) as f:
+            applied = json.load(f)
+    applied_links = {a.get("link", "") for a in applied}
+    
+    # Filter new jobs
+    new_jobs = [j for j in eligible if j["link"] not in applied_links]
+    new_jobs = new_jobs[:max_jobs]
+    
+    if not new_jobs:
+        print("✅ No new jobs to apply to!")
     """Auto-apply to ENTRY-LEVEL REMOTE jobs using Comet browser with saved login."""
     print(f"🚀 Auto-Apply Engine Starting...")
     print(f"   Comet Browser: {'✅' if USE_COMET else '❌'}")
@@ -160,56 +210,16 @@ def auto_apply(max_jobs=10):
         
         try:
             page.goto(job["link"], timeout=30000)
-            # Wait for page to fully load (LinkedIn is SPA-heavy)
-            page.wait_for_load_state("networkidle", timeout=15000)
-            time.sleep(4)
+            time.sleep(3)
             
-            # Scroll to make sure button is loaded
-            page.evaluate("window.scrollBy(0, 300)")
-            time.sleep(1)
-            
-            # Look for Easy Apply button (try multiple selectors)
-            apply_button = None
-            button_selectors = [
-                # LinkedIn current selectors (2024-2025)
-                'button[data-control-name="apply_button"]',
-                'button[data-control-name="continue_apply_click"]',
-                'button[data-control-name="continue_to_apply"]',
-                # Text-based selectors
-                'button:has-text("Easy Apply")',
-                'button:has-text("Apply")',
-                # Class-based selectors
-                'button.share-box-button--apply',
-                'a[data-control-name="spark_apply_apply_now"]',
-            ]
-            
-            for selector in button_selectors:
-                try:
-                    btn = page.locator(selector).first
-                    if btn.is_visible(timeout=2000):
-                        apply_button = btn
-                        print(f"   → Found button: {selector[:40]}...")
-                        break
-                except:
-                    continue
-            
-            if apply_button:
-                apply_button.click()
-                print("   → Clicked Easy Apply")
-                time.sleep(3)
-                
-                # Check if we're on the application form or got redirected
-                current_url = page.url
-                if "apply" not in current_url and "job" not in current_url:
-                    print(f"   → Redirected to external site: {current_url[:60]}...")
-                    results.append({
-                        "title": job["title"],
-                        "company": job.get("company", ""),
-                        "link": job["link"],
-                        "result": "External Application",
-                        "date": datetime.now().strftime("%Y-%m-%d"),
-                    })
-                    continue
+            # Look for Easy Apply button
+            try:
+                # Try multiple selectors for Easy Apply
+                apply_button = page.locator('[data-control-name="continue_apply_click"]').first
+                if apply_button.is_visible(timeout=5000):
+                    apply_button.click()
+                    print("   → Clicked Easy Apply")
+                    time.sleep(2)
                     
                     # Initialize AI answerer if available
                     ai = None
