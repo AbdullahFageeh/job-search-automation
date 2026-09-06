@@ -120,14 +120,34 @@ def auto_apply(max_jobs=10):
     for j in jobs + sa_jobs:
         all_jobs[j["link"]] = j
     
-    # Filter: remote OR saudi arabia
+    # Filter: remote OR saudi arabia (all levels accepted)
     eligible = [j for j in all_jobs.values() if is_remote_job(j) or is_saudi_arabia_job(j)]
     remote_count = sum(1 for j in all_jobs.values() if is_remote_job(j) and not is_saudi_arabia_job(j))
     sa_count = sum(1 for j in all_jobs.values() if is_saudi_arabia_job(j))
     
+    # Entry-level indicator keywords for prioritization
+    entry_keywords = [
+        "entry level", "entry-level", "entrylevel", "junior", "associate",
+        "coordinator", "analyst", "specialist", "assistant", "intern",
+        "trainee", "graduate", "new grad", "new-grad", "recent grad",
+        "no experience", "0-1", "0-2", "0-3 years", "0-5 years",
+        "1-2", "1-3", "up to 2", "up to 3", "fresh grad", "2027", "2026",
+    ]
+    
+    # Sort: entry-level first, then others (fallback)
+    def is_entry_level(j):
+        text = (j.get("title", "") + " " + j.get("company", "")).lower()
+        return any(kw in text for kw in entry_keywords)
+    
+    eligible.sort(key=lambda j: 0 if is_entry_level(j) else 1)
+    
+    entry_count = sum(1 for j in eligible if is_entry_level(j))
+    other_count = len(eligible) - entry_count
+    
     print(f"📊 Total jobs: {len(all_jobs)}")
     print(f"   Remote: {remote_count}, Saudi Arabia: {sa_count}")
-    print(f"   Eligible: {len(eligible)}")
+    print(f"   Entry-level: {entry_count}, Other levels: {other_count}")
+    print(f"   Eligible: {len(eligible)} (entry-level prioritized first)")
     
     # Load already applied
     applied_file = BASE_DIR / "logs" / "linkedin_applied.json"
@@ -137,7 +157,7 @@ def auto_apply(max_jobs=10):
             applied = json.load(f)
     applied_links = {a.get("link", "") for a in applied}
     
-    # Filter new jobs
+    # Filter new jobs (entry-level first, then fallback to other levels)
     new_jobs = [j for j in eligible if j["link"] not in applied_links]
     new_jobs = new_jobs[:max_jobs]
     

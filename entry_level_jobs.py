@@ -42,18 +42,25 @@ TARGET_KEYWORDS = [
     "associate", "specialist", "assistant", "customer success", "service delivery",
 ]
 
-AVOID_KEYWORDS = [
-    "senior", "principal", "director", "vp", "head of", "chief",
-    "manager", "10+ years", "5+ years", "8+ years", "10 years", "5 years",
-]
+# No longer filtering by seniority — we capture ALL ops levels
+# (entry-level preferred, but mid/senior ops roles are included too)
+AVOID_KEYWORDS = []
 
 SEARCH_SOURCES = [
+    # Entry-level (preferred)
     {"name": "Entry-Level Ops", "keywords": "entry%20level%20operations"},
     {"name": "Junior Ops", "keywords": "junior%20operations"},
     {"name": "Operations Analyst", "keywords": "operations%20analyst"},
     {"name": "Operations Coordinator", "keywords": "operations%20coordinator"},
     {"name": "Operations Assistant", "keywords": "operations%20assistant"},
     {"name": "Program Coordinator", "keywords": "program%20coordinator"},
+    # Mid/Senior (included when entry-level options are limited)
+    {"name": "Operations Manager", "keywords": "operations%20manager"},
+    {"name": "Operations Lead", "keywords": "operations%20lead"},
+    {"name": "Business Operations", "keywords": "business%20operations"},
+    {"name": "Revenue Ops", "keywords": "revenue%20operations"},
+    {"name": "Program Manager Ops", "keywords": "program%20manager%20operations"},
+    {"name": "Site Reliability Ops", "keywords": "site%20reliability%20operations"},
 ]
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -80,10 +87,9 @@ def save_jobs(jobs):
         json.dump(jobs, f, indent=2)
 
 def is_entry_level(title, snippet=""):
+    """Check if a job appears entry-level (for tagging, not filtering)."""
     combined = (title + " " + snippet).lower()
-    has_entry = any(ind in combined for ind in ENTRY_INDICATORS)
-    has_senior = any(kw in combined for kw in AVOID_KEYWORDS)
-    return has_entry and not has_senior
+    return any(ind in combined for ind in ENTRY_INDICATORS)
 
 def is_ops_relevant(title, snippet=""):
     combined = (title + " " + snippet).lower()
@@ -186,9 +192,7 @@ def scrape_linkedin(source):
                 seen.add(href)
                 continue
             
-            # Remote jobs: must be entry level
-            if not is_entry_level(title):
-                continue
+            # Remote jobs: accept ALL levels (entry-level is preferred but not required)
             if not is_remote(job):
                 logger.info(f"  Skipped (not remote): {title} ({location})")
                 seen.add(href)
