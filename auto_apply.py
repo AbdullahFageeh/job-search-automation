@@ -150,16 +150,56 @@ def auto_apply(max_jobs=10):
         
         try:
             page.goto(job["link"], timeout=30000)
-            time.sleep(3)
+            # Wait for page to fully load (LinkedIn is SPA-heavy)
+            page.wait_for_load_state("networkidle", timeout=15000)
+            time.sleep(4)
             
-            # Look for Easy Apply button
-            try:
-                # Try multiple selectors for Easy Apply
-                apply_button = page.locator('[data-control-name="continue_apply_click"]').first
-                if apply_button.is_visible(timeout=5000):
-                    apply_button.click()
-                    print("   → Clicked Easy Apply")
-                    time.sleep(2)
+            # Scroll to make sure button is loaded
+            page.evaluate("window.scrollBy(0, 300)")
+            time.sleep(1)
+            
+            # Look for Easy Apply button (try multiple selectors)
+            apply_button = None
+            button_selectors = [
+                # LinkedIn current selectors (2024-2025)
+                'button[data-control-name="apply_button"]',
+                'button[data-control-name="continue_apply_click"]',
+                'button[data-control-name="continue_to_apply"]',
+                # Text-based selectors
+                'button:has-text("Easy Apply")',
+                'button:has-text("Apply")',
+                # Class-based selectors
+                'button.share-box-button--apply',
+                'a[data-control-name="spark_apply_apply_now"]',
+            ]
+            
+            for selector in button_selectors:
+                try:
+                    btn = page.locator(selector).first
+                    if btn.is_visible(timeout=2000):
+                        apply_button = btn
+                        print(f"   → Found button: {selector[:40]}...")
+                        break
+                except:
+                    continue
+            
+            if apply_button:
+                apply_button.click()
+                print("   → Clicked Easy Apply")
+                time.sleep(3)
+                
+                # Check if we're on the application form or got redirected
+                current_url = page.url
+                if "apply" not in current_url and "job" not in current_url:
+                    print(f"   → Redirected to external site: {current_url[:60]}...")
+                    results.append({
+                        "title": job["title"],
+                        "company": job.get("company", ""),
+                        "link": job["link"],
+                        "result": "External Application",
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                    })
+                    continue
                     
                     # Initialize AI answerer if available
                     ai = None
