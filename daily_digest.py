@@ -45,26 +45,49 @@ def send_digest(to_email, subject, body):
         print(f"❌ Email failed: {e}")
 
 def generate_digest():
-    """Generate daily digest of new jobs."""
+    """Generate daily digest of new jobs (last 7 days)."""
+    from datetime import datetime, timedelta
+    
     entry_jobs = load_json("logs/entry_level_jobs.json")
     other_jobs = load_json("logs/other_jobs.json")
     linkedin_applied = load_json("logs/linkedin_applied.json")
     
     today = datetime.now().strftime("%Y-%m-%d")
-    today_entry = [j for j in entry_jobs if j.get("found_at", "").startswith(today)]
-    today_other = [j for j in other_jobs if j.get("found_at", "").startswith(today)]
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    # Show jobs from last 7 days (not just today)
+    recent_entry = [j for j in entry_jobs if j.get("found_at", "").startswith(week_ago) or j.get("found_at", "").startswith(today)]
+    recent_other = [j for j in other_jobs if j.get("found_at", "").startswith(week_ago) or j.get("found_at", "").startswith(today)]
+    
+    # Also include all jobs if fewer than 10 found (first run scenario)
+    if len(recent_entry) + len(recent_other) < 10:
+        recent_entry = entry_jobs
+        recent_other = other_jobs
+    
     applied_today = [a for a in linkedin_applied if a.get("date", "").startswith(today)]
     
     body = f"""
     <h2>📋 Daily Job Search Digest — {today}</h2>
+    <p><i>Showing jobs from the last 7 days</i></p>
     
-    <h3>🎯 New Entry-Level Jobs Found: {len(today_entry)}</h3>
+    <h3>🎯 Entry-Level Jobs Found: {len(recent_entry)}</h3>
     <table border="1" cellpadding="5" cellspacing="0">
-    <tr><th>Role</th><th>Company</th><th>Link</th></tr>
+    <tr><th>Role</th><th>Company</th><th>Date</th><th>Link</th></tr>
     """
     
-    for j in today_entry[:15]:
-        body += f'<tr><td>{j.get("title","")}</td><td>{j.get("company","")}</td><td><a href="{j["link"]}">Apply</a></td></tr>\n'
+    for j in recent_entry[:20]:
+        body += f'<tr><td>{j.get("title","")}</td><td>{j.get("company","")}</td><td>{j.get("found_at","")[:10]}</td><td><a href="{j.get("link","#")}">Apply</a></td></tr>\n'
+    
+    body += f"""
+    </table>
+    
+    <h3>📋 Other Board Jobs Found: {len(recent_other)}</h3>
+    <table border="1" cellpadding="5" cellspacing="0">
+    <tr><th>Role</th><th>Source</th><th>Date</th><th>Link</th></tr>
+    """
+    
+    for j in recent_other[:20]:
+        body += f'<tr><td>{j.get("title","")}</td><td>{j.get("source","")}</td><td>{j.get("found_at","")[:10]}</td><td><a href="{j.get("link","#")}">Apply</a></td></tr>\n'
     
     body += f"""
     </table>
@@ -85,7 +108,7 @@ def generate_digest():
     
     send_digest(
         "AbdullahFageeh@gmail.com",
-        f"{len(today_entry)} New Entry-Level Ops Jobs",
+        f"{len(recent_entry) + len(recent_other)} Jobs Found (Last 7 Days)",
         body
     )
     
@@ -93,6 +116,7 @@ def generate_digest():
     digest_path = BASE_DIR / "logs" / f"digest_{today}.html"
     digest_path.write_text(body, encoding="utf-8")
     print(f"💾 Digest saved to {digest_path}")
+    print(f"📊 Summary: {len(recent_entry)} entry-level + {len(recent_other)} other board jobs")
 
 if __name__ == "__main__":
     generate_digest()

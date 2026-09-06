@@ -12,8 +12,9 @@ build/
 venv/
 .env.local
 
-# Logs & Data
+# Logs & Data (keep JSON data files for persistence across runs)
 logs/
+!logs/*.json
 *.sqlite
 *.db
 

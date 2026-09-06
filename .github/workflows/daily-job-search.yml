@@ -2,8 +2,8 @@ name: Daily Job Search
 
 on:
   schedule:
-    - cron: '0 8 * * *'
-  workflow_dispatch:
+    - cron: '0 8 * * *'  # Daily at 8 AM UTC
+  workflow_dispatch:  # Manual trigger
 
 env:
   PYTHON_VERSION: '3.11'
@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,42 +26,52 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install playwright python-dotenv requests beautifulsoup4 lxml httpx jinja2 nltk python-Levenshtein tabulate openpyxl
-          playwright install chromium
-          playwright install-deps
+          pip install --upgrade pip
+          pip install httpx beautifulsoup4 lxml python-dotenv jinja2 nltk python-Levenshtein tabulate openpyxl
 
       - name: Create .env from secrets
         run: |
-          echo "LINKEDIN_EMAIL=${{ secrets.LINKEDIN_EMAIL }}" >> .env
-          echo "LINKEDIN_PASSWORD=${{ secrets.LINKEDIN_PASSWORD }}" >> .env
           echo "GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}" >> .env
           echo "EMAIL=${{ secrets.EMAIL }}" >> .env
           echo "PHONE=${{ secrets.PHONE }}" >> .env
-          echo "LINKEDIN_URL=${{ secrets.LINKEDIN_URL }}" >> .env
-          echo "MIN_SALARY=50000" >> .env
 
-      - name: Create logs directory
+      - name: Ensure logs directory exists
         run: mkdir -p logs
 
-      - name: Scan non-LinkedIn job boards
-        run: python3 other_boards_monitor.py once
+      - name: Scan job boards (non-LinkedIn, HTTP only)
+        run: |
+          echo "=== Running job board scraper ==="
+          python3 other_boards_monitor.py once
+          echo "=== Scraper complete ==="
+
+      - name: Show results summary
+        run: |
+          echo "=== Job Stats ==="
+          python3 other_boards_monitor.py stats
+          echo "=== Recent Jobs ==="
+          python3 other_boards_monitor.py alerts
+          echo "=== Total jobs in file ==="
+          python3 -c "import json, os; j='logs/other_jobs.json'; print(f'Total stored jobs: {len(json.load(open(j))) if os.path.exists(j) else 0}')"
 
       - name: Generate ATS report
-        run: python3 ats_optimizer.py || true
+        continue-on-error: true
+        run: python3 ats_optimizer.py
 
-      - name: Generate application tracker
-        run: python3 tracker.py || true
+      - name: Update tracker
+        continue-on-error: true
+        run: python3 tracker.py
 
-      - name: Generate daily digest email
-        run: python3 daily_digest.py || true
+      - name: Generate daily digest
+        continue-on-error: true
+        run: python3 daily_digest.py
 
-      - name: Commit new job data
+      - name: Commit and push results
         run: |
           git config user.name "Job Bot"
           git config user.email "bot@automation.local"
-          git add logs/
-          git diff --cached --quiet || git commit -m "Auto: update job data"
-          git push
+          git add logs/*.json logs/*.html
+          git diff --cached --quiet || git commit -m "🤖 Daily: job data update ($(date -u +%Y-%m-%d))"
+          git push || echo "⚠️ Push failed"
 
       - name: Upload results as artifact
         uses: actions/upload-artifact@v4
@@ -69,4 +81,6 @@ jobs:
             logs/entry_level_jobs.json
             logs/other_jobs.json
             logs/linkedin_applied.json
+            logs/digest_*.html
           retention-days: 14
+          if-no-files-found: warn

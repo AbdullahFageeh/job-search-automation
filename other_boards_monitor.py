@@ -74,6 +74,9 @@ TARGET_KEYWORDS = [
     "customer success operations", "revenue operations",
     "program manager", "project manager",
     "service delivery", "site reliability",
+    "operations associate", "operations coordinator", "operations analyst",
+    "operations specialist", "business analyst", "operations support",
+    "workflow", "process improvement", "operational",
 ]
 
 AVOID_KEYWORDS = [
@@ -87,15 +90,44 @@ logger = logging.getLogger(__name__)
 
 
 def load_seen() -> set:
+    """Load seen URLs, expiring entries older than 30 days."""
+    from datetime import datetime, timedelta
     if SEEN_FILE.exists():
         with open(SEEN_FILE) as f:
-            return set(json.load(f))
+            seen_data = json.load(f)
+        # Each entry is now a dict: {"url": "...", "seen_at": "..."}
+        # Migrate old format (plain strings) to new format
+        cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+        seen_urls = set()
+        cleaned = []
+        for entry in seen_data:
+            if isinstance(entry, dict):
+                if entry.get("seen_at", "1970-01-01") >= cutoff:
+                    seen_urls.add(entry["url"])
+                    cleaned.append(entry)
+                # else: expired, drop it
+            else:
+                # Legacy format (plain string) — keep but mark as new
+                seen_urls.add(entry)
+                cleaned.append({"url": entry, "seen_at": datetime.now().isoformat()})
+        # Clean up seen file with only recent entries
+        if len(cleaned) != len(seen_data):
+            save_seen_raw(cleaned)
+        return seen_urls
     return set()
 
 
 def save_seen(seen: set):
+    """Save seen URLs as list of dicts with timestamps."""
+    from datetime import datetime
+    seen_list = [{"url": url, "seen_at": datetime.now().isoformat()} for url in seen]
+    save_seen_raw(seen_list)
+
+
+def save_seen_raw(seen_list: list):
+    """Internal: save seen data without timestamp logic."""
     with open(SEEN_FILE, "w") as f:
-        json.dump(list(seen), f)
+        json.dump(seen_list, f)
 
 
 def load_jobs() -> list:
