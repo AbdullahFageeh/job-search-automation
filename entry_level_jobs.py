@@ -186,6 +186,8 @@ def scrape_linkedin(source):
                         sa_jobs.append(job)
                         save_sa_jobs(sa_jobs)
                         logger.info(f"  Saved to Saudi jobs: {title} ({location})")
+                    # Also include SA jobs in the main remote jobs list
+                    jobs.append(job)
                 else:
                     logger.info(f"  Skipped (not remote): {title} ({location})")
                 seen.add(href)
