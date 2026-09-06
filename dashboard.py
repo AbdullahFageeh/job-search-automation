@@ -51,6 +51,7 @@ def dashboard():
     # Stats
     applied = load_db(BASE_DIR / "logs" / "applied.json", [])
     linkedin_applied = load_db(BASE_DIR / "logs" / "linkedin_applied.json", [])
+    sa_jobs = load_db(BASE_DIR / "logs" / "saudi_jobs.json", [])
     emails_sent = load_db(BASE_DIR / "logs" / "emails_sent.json", [])
     contacts = load_db(BASE_DIR / "logs" / "contacts.json", [])
     alerts = load_db(BASE_DIR / "logs" / "alerts.json", [])

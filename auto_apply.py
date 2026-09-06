@@ -82,6 +82,16 @@ def is_remote_job(job):
         return False
     return True
 
+def is_saudi_arabia_job(job):
+    """Check if job is located in Saudi Arabia."""
+    location = job.get("location", "").lower()
+    title = job.get("title", "").lower()
+    sa_keywords = [
+        "saudi arabia", "saudi", "riyadh", "jeddah", "dammam",
+        "ksa", "tabuk", "khobar", "duba", "al khobar", "medina", "makkah", "mecca",
+    ]
+    return any(kw in location for kw in sa_keywords) or any(kw in title for kw in sa_keywords)
+
 def auto_apply(max_jobs=10):
     """Auto-apply to ENTRY-LEVEL REMOTE jobs using Comet browser with saved login."""
     print(f"🚀 Auto-Apply Engine Starting...")

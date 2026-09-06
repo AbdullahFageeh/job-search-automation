@@ -23,6 +23,7 @@ LOGS_DIR = BASE_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 SEEN_FILE = LOGS_DIR / "entry_level_seen.json"
 JOBS_FILE = LOGS_DIR / "entry_level_jobs.json"
+SA_JOBS_FILE = LOGS_DIR / "saudi_jobs.json"  # On-site jobs within Saudi Arabia
 
 LINKEDIN_EMAIL = os.getenv("LINKEDIN_EMAIL", "Abdullahfageeh@gmail.com")
 LINKEDIN_PASSWORD = os.getenv("LINKEDIN_PASSWORD", "@Bodi9090")
@@ -109,6 +110,16 @@ def is_remote(job_dict):
         return False
     return True
 
+def is_saudi_arabia(job_dict):
+    """Check if job is located in Saudi Arabia."""
+    location = job_dict.get("location", "").lower()
+    title = job_dict.get("title", "").lower()
+    sa_keywords = [
+        "saudi arabia", "saudi", "riyadh", "jeddah", "dammam",
+        "ksa", "tabuk", "khobar", "duba", "al khobar", "medina", "makkah", "mecca",
+    ]
+    return any(kw in location for kw in sa_keywords) or any(kw in title for kw in sa_keywords)
+
 def scrape_linkedin(source):
     jobs = []
     seen = load_seen()
@@ -166,9 +177,17 @@ def scrape_linkedin(source):
                 "entry_level": True,
             }
             
-            # Only add truly remote jobs
+            # Only add truly remote jobs (or Saudi Arabia on-site)
             if not is_remote(job):
-                logger.info(f"  Skipped (not remote): {title} ({location})")
+                # Save Saudi Arabia on-site jobs to separate file
+                if is_saudi_arabia(job):
+                    sa_jobs = load_sa_jobs()
+                    if job["link"] not in {j["link"] for j in sa_jobs}:
+                        sa_jobs.append(job)
+                        save_sa_jobs(sa_jobs)
+                        logger.info(f"  Saved to Saudi jobs: {title} ({location})")
+                else:
+                    logger.info(f"  Skipped (not remote): {title} ({location})")
                 seen.add(href)
                 continue
             
@@ -201,6 +220,16 @@ def scan_all():
     save_jobs(existing)
     return all_new
 
+def load_sa_jobs() -> list:
+    if SA_JOBS_FILE.exists():
+        with open(SA_JOBS_FILE) as f:
+            return json.load(f)
+    return []
+
+def save_sa_jobs(jobs: list):
+    with open(SA_JOBS_FILE, "w") as f:
+        json.dump(jobs, f, indent=2)
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Entry-Level Remote Job Finder")
@@ -208,6 +237,7 @@ def main():
     sub.add_parser("scan", help="Scan for entry-level remote ops jobs")
     sub.add_parser("list", help="List found jobs")
     sub.add_parser("stats", help="Show stats")
+    sub.add_parser("saudi", help="Show Saudi Arabia on-site jobs")
     args = parser.parse_args()
 
     if args.action == "scan":
@@ -252,8 +282,30 @@ def main():
                 sources[src] = sources.get(src, 0) + 1
             for src, count in sorted(sources.items(), key=lambda x: -x[1]):
                 print(f"  {src}: {count}")
+        
+        # Saudi Arabia stats
+        sa_jobs = load_sa_jobs()
+        if sa_jobs:
+            print(f"\n🇸🇦 Saudi Arabia On-Site Jobs: {len(sa_jobs)}")
+            for j in sa_jobs[:10]:
+                print(f"  {j['title']} — {j.get('location', 'N/A')}")
+
+    elif args.action == "saudi":
+        sa_jobs = load_sa_jobs()
+        if not sa_jobs:
+            print("No Saudi Arabia jobs yet. Run: python3 entry_level_jobs.py scan")
+            return
+        print(f"\n🇸🇦 Saudi Arabia On-Site Jobs ({len(sa_jobs)} total)\n")
+        for j in sa_jobs:
+            print(f"  {j['title']}")
+            if j.get('company'):
+                print(f"    {j['company']}")
+            print(f"    Location: {j.get('location', 'N/A')}")
+            print(f"    {j['link']}")
+            print()
+
     else:
-        print("Usage: python3 entry_level_jobs.py [scan|list|stats]")
+        print("Usage: python3 entry_level_jobs.py [scan|list|stats|saudi]")
 
 if __name__ == "__main__":
     main()
