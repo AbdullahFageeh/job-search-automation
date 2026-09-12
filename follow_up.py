@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from email_outreach import send_email, load_db
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")

@@ -5,6 +5,7 @@ Scans all sources, scores jobs with resume matcher, emails summary.
 """
 
 import json
+import os
 import smtplib
 import sys
 from email.mime.text import MIMEText
@@ -26,7 +27,10 @@ def load_json(path):
 def send_digest(to_email, subject, body):
     """Send digest email via Gmail."""
     from_addr = "AbdullahFageeh@gmail.com"
-    password = "cucfcehiapgxttyh"
+    password = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not password:
+        print("Email skipped: GMAIL_APP_PASSWORD is not configured.")
+        return
     
     msg = MIMEMultipart()
     msg["From"] = from_addr
